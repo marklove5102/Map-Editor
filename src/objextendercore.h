@@ -51,8 +51,9 @@ public:
     }
 
     ~ObjExtender() {
-        for (unsigned int i = 0; i < numBlocks; i++)
+        for (unsigned int i = 0; i < numBlocks; i++) {
             delete blocks[i];
+        }
         delete[] blocks;
     }
 

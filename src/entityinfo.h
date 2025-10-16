@@ -12,14 +12,14 @@
 */
 class EntityInfo {
   public:
-  CVector m_Euler;
-    int m_nHandle; 
-    CObject *m_pObj; 
-    std::string m_sModelName;
+    CVector m_Euler = { 0, 0, 0 };
+    int m_nHandle = NULL; 
+    CObject *m_pObj = nullptr; 
+    std::string m_sModelName = "";
 
     EntityInfo(CObject *obj);
     CVector GetEuler();
     void SetEuler(CVector rot);
-    CQuaternion GetQuat();
+    CQuaternion GetQuat() const;
     void SetQuat(CQuaternion quat);
 };
