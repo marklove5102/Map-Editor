@@ -93,8 +93,11 @@ CVector EntityInfo::GetEuler()
 CQuaternion EntityInfo::GetQuat() const
 {
     CQuaternion quat;
-    plugin::Command<plugin::Commands::GET_OBJECT_QUATERNION>(m_nHandle, &quat.imag.x, &quat.imag.y,
-                                                             &quat.imag.z, &quat.real);
+    RwMatrix *mat = (RwMatrix *)m_pObj->GetMatrix();
+    if (mat)
+    {
+        quat.Set(*mat);
+    }
     return quat;
 }
 
