@@ -11,6 +11,7 @@
 #include <CSprite.h>
 #include <D3dx9math.h>
 #include "editor.h"
+#include "ImGuizmoSA.h"
 
 #include "contextmenus.h"
 #include "popups.h"
@@ -21,24 +22,28 @@ static BYTE m_bHudState;
 static BYTE m_bRadarState;
 static bool m_bNeverWanted;
 
-ImVec2 ViewportMgr::GetSize() {
+ImVec2 ViewportMgr::GetSize()
+{
     return m_fViewportSize;
 }
 
 ViewportMgr Viewport;
-ViewportMgr::ViewportMgr() {
-    Events::initGameEvent += [this]() {
+ViewportMgr::ViewportMgr()
+{
+    Events::initGameEvent += [this]()
+    {
         Viewport.m_nMoveSpeedMul = gConfig.Get("editor.moveSpeed", 1.0f);
     };
 
     // Highlight selection
-    injector::MakeInline(0x534388, 0x53438E, [](injector::reg_pack& regs) {
+    injector::MakeInline(0x534388, 0x53438E, [](injector::reg_pack &regs)
+                         {
         regs.edx |= 0x2000;
-        Viewport.HighlightSelection((CEntity*)regs.esi);
-    });
+        Viewport.HighlightSelection((CEntity*)regs.esi); });
 }
 
-void ViewportMgr::Init() {
+void ViewportMgr::Init()
+{
     static CVector tMouse;
 
     CPlayerPed *pPlayer = FindPlayerPed();
@@ -46,10 +51,10 @@ void ViewportMgr::Init() {
     CVector pos = pPlayer->GetPosition();
 
     Command<Commands::SET_EVERYONE_IGNORE_PLAYER>(0, true);
-    m_bHudState = patch::Get<BYTE>(0xBA6769); // hud
+    m_bHudState = patch::Get<BYTE>(0xBA6769);   // hud
     m_bRadarState = patch::Get<BYTE>(0xBA676C); // radar
-    patch::Set<BYTE>(0xBA6769, 0); // hud
-    patch::Set<BYTE>(0xBA676C, 2); // radar
+    patch::Set<BYTE>(0xBA6769, 0);              // hud
+    patch::Set<BYTE>(0xBA676C, 2);              // radar
 
     CPad::GetPad(0)->DisablePlayerControls = true;
     pPlayer->bIsVisible = true;
@@ -67,7 +72,8 @@ void ViewportMgr::Init() {
     Command<Commands::CAMERA_PERSIST_FOV>(true);
 
     m_bNeverWanted = patch::Get<bool>(0x969171, false);
-    if (!m_bNeverWanted) {
+    if (!m_bNeverWanted)
+    {
         Call<0x4396C0>();
     }
 
@@ -76,41 +82,50 @@ void ViewportMgr::Init() {
 }
 
 /*
-*  Part of the source is taken from DrawColsSA by Sergeanur
-*  https://github.com/Sergeanur/
-*/
+ *  Part of the source is taken from DrawColsSA by Sergeanur
+ *  https://github.com/Sergeanur/
+ */
 
-static void RenderLineWithClipping(float x1, float y1, float z1, float x2, float y2, float z2, unsigned int c1, unsigned int c2) {
-    ((void (__cdecl *)(float, float, float, float, float, float, unsigned int, unsigned int))0x6FF4F0)(x1, y1, z1, x2, y2, z2, c1, c2);
+static void RenderLineWithClipping(float x1, float y1, float z1, float x2, float y2, float z2, unsigned int c1, unsigned int c2)
+{
+    ((void(__cdecl *)(float, float, float, float, float, float, unsigned int, unsigned int))0x6FF4F0)(x1, y1, z1, x2, y2, z2, c1, c2);
 }
 
-static void NodeWrapperRecursive(RwFrame* frame, CEntity* pEntity, std::function<void(RwFrame*)> func) {
-    if (frame) {
+static void NodeWrapperRecursive(RwFrame *frame, CEntity *pEntity, std::function<void(RwFrame *)> func)
+{
+    if (frame)
+    {
         func(frame);
-        if (RwFrame* newFrame = frame->child) {
+        if (RwFrame *newFrame = frame->child)
+        {
             NodeWrapperRecursive(newFrame, pEntity, func);
         }
-        if (RwFrame* newFrame = frame->next) {
+        if (RwFrame *newFrame = frame->next)
+        {
             NodeWrapperRecursive(newFrame, pEntity, func);
         }
     }
     return;
 }
 
-void ViewportMgr::HighlightSelection(CEntity *pEntity) {
+void ViewportMgr::HighlightSelection(CEntity *pEntity)
+{
     static CEntity *prevEntity = nullptr;
-    if (!Editor.IsOpen() || !pEntity || !pEntity->m_pRwClump) {
+    if (!Editor.IsOpen() || !pEntity || !pEntity->m_pRwClump)
+    {
         return;
     }
 
-    if (prevEntity && prevEntity->m_nModelIndex != pEntity->m_nModelIndex 
-    && EntMgr.m_pSelected && pEntity->m_nModelIndex != EntMgr.m_pSelected->m_nModelIndex) {
-        return; 
+    if (prevEntity && prevEntity->m_nModelIndex != pEntity->m_nModelIndex && EntMgr.m_pSelected && pEntity->m_nModelIndex != EntMgr.m_pSelected->m_nModelIndex)
+    {
+        return;
     }
 
-    if (pEntity->m_nType == ENTITY_TYPE_BUILDING || pEntity->m_nType == ENTITY_TYPE_OBJECT) {
-        NodeWrapperRecursive((RwFrame*)pEntity->m_pRwClump->object.parent, pEntity, [&](RwFrame* frame) {
-            RwFrameForAllObjects(frame, [](RwObject* object, void* data) -> RwObject* {
+    if (pEntity->m_nType == ENTITY_TYPE_BUILDING || pEntity->m_nType == ENTITY_TYPE_OBJECT)
+    {
+        NodeWrapperRecursive((RwFrame *)pEntity->m_pRwClump->object.parent, pEntity, [&](RwFrame *frame)
+                             { RwFrameForAllObjects(frame, [](RwObject *object, void *data) -> RwObject *
+                                                    {
                 if (object->type == rpATOMIC) {
                     RpAtomic* atomic = reinterpret_cast<RpAtomic*>(object);
                     CEntity* pEntity = reinterpret_cast<CEntity*>(data);
@@ -124,44 +139,48 @@ void ViewportMgr::HighlightSelection(CEntity *pEntity) {
                         }
                     }
                 }
-                return object;
-            }, pEntity);
-        });
+                return object; }, pEntity); });
     }
     prevEntity = pEntity;
 }
 
-void ViewportMgr::SetCameraPosn(const CVector &pos) {
+void ViewportMgr::SetCameraPosn(const CVector &pos)
+{
     m_fCamPos = pos;
 
     /*
-    * Since we're actually setting the player's position,
-    * we need to add the offset to it
-    */
+     * Since we're actually setting the player's position,
+     * we need to add the offset to it
+     */
     m_fCamPos.z -= PLAYER_Z_OFFSET;
     m_bCamUpdateRequired = true;
 }
 
-void ViewportMgr::DrawHoverMenu() {
-    if ( m_eState != eViewportState::Edit || !m_bHovered || m_Renderer.m_bShown) {
+void ViewportMgr::DrawHoverMenu()
+{
+    if (m_eState != eViewportState::Edit || !m_bHovered || m_Renderer.m_bShown)
+    {
         return;
     }
 
     static CVector worldPos;
-    if (Utils::TraceEntity(m_HoveredEntity, worldPos) && Interface.m_bShowHoverMenu && !Viewport.m_Renderer.m_bShown) {
+    if (Utils::TraceEntity(m_HoveredEntity, worldPos) && Interface.m_bShowHoverMenu && !Viewport.m_Renderer.m_bShown)
+    {
         Tooltip.m_Title = "##Hover Info";
         Tooltip.m_bShow = true;
-        Tooltip.m_pFunc = [this]() {
+        Tooltip.m_pFunc = [this]()
+        {
             ImGui::Text("Hover Info");
             ImGui::Separator();
             int model = m_HoveredEntity->m_nModelIndex;
-            if (m_HoveredEntity->m_nType == ENTITY_TYPE_OBJECT
-                    || m_HoveredEntity->m_nType == ENTITY_TYPE_BUILDING) {
+            if (m_HoveredEntity->m_nType == ENTITY_TYPE_OBJECT || m_HoveredEntity->m_nType == ENTITY_TYPE_BUILDING)
+            {
                 static int bmodel = 0;
                 static std::string name = "";
 
                 // lets not go over 20000 models each frame
-                if (bmodel != model) {
+                if (bmodel != model)
+                {
                     name = EntMgr.FindNameFromModel(model);
                     bmodel = model;
                 }
@@ -170,28 +189,31 @@ void ViewportMgr::DrawHoverMenu() {
             }
             std::string type = "";
 
-            if (m_HoveredEntity->m_nType == ENTITY_TYPE_OBJECT) {
+            if (m_HoveredEntity->m_nType == ENTITY_TYPE_OBJECT)
+            {
                 type = "Dynamic";
             }
-            if (m_HoveredEntity->m_nType == ENTITY_TYPE_BUILDING) {
+            if (m_HoveredEntity->m_nType == ENTITY_TYPE_BUILDING)
+            {
                 type = "Static";
             }
 
             ImGui::Text("Model: %d (%s)", model, type.c_str());
-            ImGui::Text("Position: %d, %d, %d", int(worldPos.x), int(worldPos.y), int (worldPos.z));
+            ImGui::Text("Position: %d, %d, %d", int(worldPos.x), int(worldPos.y), int(worldPos.z));
         };
     }
     Tooltip.Draw();
 }
 
-void ViewportMgr::Cleanup() {
+void ViewportMgr::Cleanup()
+{
     CPlayerPed *pPlayer = FindPlayerPed(-1);
-    CEntity* pPlayerEntity = FindPlayerEntity(-1);
+    CEntity *pPlayerEntity = FindPlayerEntity(-1);
     CVector pos = pPlayer->GetPosition();
     int hPlayer = CPools::GetPedRef(pPlayer);
 
     Command<Commands::SET_EVERYONE_IGNORE_PLAYER>(0, false);
-    patch::Set<BYTE>(0xBA6769, m_bHudState); // hud
+    patch::Set<BYTE>(0xBA6769, m_bHudState);   // hud
     patch::Set<BYTE>(0xBA676C, m_bRadarState); // radar
     CPad::GetPad(0)->DisablePlayerControls = false;
 
@@ -206,7 +228,8 @@ void ViewportMgr::Cleanup() {
     Command<Commands::CAMERA_PERSIST_FOV>(false);
     Command<Commands::RESTORE_CAMERA_JUMPCUT>();
 
-    if (!m_bNeverWanted) {
+    if (!m_bNeverWanted)
+    {
         Call<0x4396C0>();
     }
 
@@ -216,41 +239,35 @@ void ViewportMgr::Cleanup() {
     m_bInitialized = false;
 }
 
-static void my_PerspectiveFOV(float fov, float aspect, float _near, float _far, float* mret) {
-    float D2R = 3.1416f / 180.0f;
-    float yScale = 1.0 / tan(D2R * fov / 2);
-    float xScale = yScale / aspect;
-    float nearmfar = _near - _far;
-
-    float m[] = {
-        xScale, 0, 0, 0,
-        0, yScale, 0, 0,
-        0, 0, (_far + _near) / nearmfar, -1,
-        0, 0, 2*_far*_near / nearmfar, 0
-    };
-    memcpy(mret, m, sizeof(float)*16);
-}
-
-void ViewportMgr::DrawOverlay() {
+void ViewportMgr::DrawOverlay()
+{
     // -------------------------------------------------
     /*
-    * Calculations for pos & size of viewport
-    * Similar to to InfoMenu does it
-    */
+     * Calculations for pos & size of viewport
+     * Similar to to InfoMenu does it
+     */
     float width = screen::GetScreenWidth();
     float height = screen::GetScreenHeight();
-    float menuWidth = width/5.0f;
+    float menuWidth = width / 5.0f;
     float frameHeight = ImGui::GetFrameHeight();
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar + ImGuiWindowFlags_NoMove
-                             + ImGuiWindowFlags_NoCollapse + ImGuiWindowFlags_NoResize + ImGuiWindowFlags_NoBringToFrontOnFocus;
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar + ImGuiWindowFlags_NoMove + ImGuiWindowFlags_NoCollapse + ImGuiWindowFlags_NoResize + ImGuiWindowFlags_NoBringToFrontOnFocus;
 
     ImGui::SetNextWindowBgAlpha(0.0f); // and ofcource it needs to be transarent
     ImGui::SetNextWindowPos(ImVec2(0.0f, frameHeight));
-    m_fViewportSize = ImVec2(width-menuWidth, height - frameHeight);
+    m_fViewportSize = ImVec2(width - menuWidth, height - frameHeight);
     ImGui::SetNextWindowSize(m_fViewportSize);
 
-    if (ImGui::Begin("ViewPort", NULL, flags)) {
+    if (ImGui::Begin("ViewPort", NULL, flags))
+    {
         m_bHovered = ImGui::IsWindowHovered();
+
+        if (EntMgr.m_pSelected)
+        {
+            if (ImGuizmoSA::g_Gizmo.Manipulate(EntMgr.m_pSelected))
+            {
+                // Gizmo is being used - object is automatically updated
+            }
+        }
 
         // if (ObjManager::m_pSelected)
         // {
@@ -262,7 +279,6 @@ void ViewportMgr::DrawOverlay() {
         // 	CMatrix objMat = *ObjManager::m_pSelected->GetMatrix();
         // 	RwMatrix viewMat = TheCamera.m_pRwCamera->viewMatrix;
 
-
         // 	ImGuizmo::Manipulate((float*)&viewMat, (float*)&projectionMatrix, ImGuizmo::OPERATION::TRANSLATE, ImGuizmo::MODE::WORLD, (float*)&objMat);
         // }
 
@@ -272,17 +288,21 @@ void ViewportMgr::DrawOverlay() {
     }
 }
 
-void ViewportMgr::Process() {
-    if (!m_bInitialized) {
+void ViewportMgr::Process()
+{
+    if (!m_bInitialized)
+    {
         Init();
     }
 
-    if (Interface.m_bShowGUI) {
+    if (Interface.m_bShowGUI)
+    {
         DrawOverlay();
         ProcessInputs();
         DrawHoverMenu();
 
-        if (m_bHovered && ImGui::IsMouseClicked(1)) {
+        if (m_bHovered && ImGui::IsMouseClicked(1))
+        {
             ContextMenu.m_bShow = true;
             ContextMenu.m_pFunc = ContextMenu_Viewport;
             ContextMenu.m_Root = "";
@@ -301,32 +321,39 @@ void ViewportMgr::Process() {
     int ratio = 1 / (1 + (delta * m_nMoveSpeedMul));
     float speed = (m_nMoveSpeedMul + m_nMoveSpeedMul * ratio * delta);
 
-    CPlayerPed* pPlayer = FindPlayerPed(-1);
+    CPlayerPed *pPlayer = FindPlayerPed(-1);
     int hPlayer = CPools::GetPedRef(pPlayer);
     CVector pos = pPlayer->GetPosition();
     // -------------------------------------------------
     // Check if camera position was updated externally
     // If it was then change to new values
-    if (m_bCamUpdateRequired) {
+    if (m_bCamUpdateRequired)
+    {
         pos = m_fCamPos;
         m_bCamUpdateRequired = false;
     }
 
-    if (Interface.m_bInputLocked) {
+    if (Interface.m_bInputLocked)
+    {
         return;
     }
 
-    if (viewportSwitchKey.Pressed()) {
-        if(m_eState == eViewportState::Edit) {
+    if (viewportSwitchKey.Pressed())
+    {
+        if (m_eState == eViewportState::Edit)
+        {
             m_eState = eViewportState::View;
             D3dHook::SetMouseState(false);
-        } else {
+        }
+        else
+        {
             D3dHook::SetMouseState(true);
             m_eState = eViewportState::Edit;
         }
     }
 
-    if (KeyPressed(VK_LSHIFT)) {
+    if (KeyPressed(VK_LSHIFT))
+    {
         speed *= 2;
     }
 
@@ -334,16 +361,22 @@ void ViewportMgr::Process() {
     // Skipping 2 frames to fix this issue for now
     // TODO: FIX
     static size_t skippedFrames;
-    if(m_eState == eViewportState::View) {
-        if (skippedFrames > 1) {
+    if (m_eState == eViewportState::View)
+    {
+        if (skippedFrames > 1)
+        {
             CVector mouseDelta;
             Command<Commands::GET_PC_MOUSE_MOVEMENT>(&mouseDelta.x, &mouseDelta.y);
             m_fMousePos.x -= mouseDelta.x / MOUSE_FACTOR_X;
             m_fMousePos.y += mouseDelta.y / MOUSE_FACTOR_Y;
-        } else {
+        }
+        else
+        {
             ++skippedFrames;
         }
-    } else {
+    }
+    else
+    {
         skippedFrames = 0;
     }
 
@@ -352,16 +385,20 @@ void ViewportMgr::Process() {
     m_fMousePos.y = m_fMousePos.y > 150.0f ? 150.0f : m_fMousePos.y;
     m_fMousePos.y = m_fMousePos.y < -150.0f ? -150.0f : m_fMousePos.y;
 
-    if (KeyPressed(VK_LCONTROL)) {
+    if (KeyPressed(VK_LCONTROL))
+    {
         speed /= 2;
     }
 
-    if (KeyPressed(VK_LSHIFT)) {
+    if (KeyPressed(VK_LSHIFT))
+    {
         speed *= 2;
     }
 
-    if (KeyPressed(VK_KEY_W) || KeyPressed(VK_KEY_S)) {
-        if (KeyPressed(VK_KEY_S)) {
+    if (KeyPressed(VK_KEY_W) || KeyPressed(VK_KEY_S))
+    {
+        if (KeyPressed(VK_KEY_S))
+        {
             speed *= -1;
         }
 
@@ -373,8 +410,10 @@ void ViewportMgr::Process() {
         pos.z += speed * 2 * sin(m_fMousePos.y / 3 * 3.14159f / 180.0f);
     }
 
-    if (KeyPressed(VK_KEY_A) || KeyPressed(VK_KEY_D)) {
-        if (KeyPressed(VK_KEY_A)) {
+    if (KeyPressed(VK_KEY_A) || KeyPressed(VK_KEY_D))
+    {
+        if (KeyPressed(VK_KEY_A))
+        {
             speed *= -1;
         }
 
@@ -388,9 +427,12 @@ void ViewportMgr::Process() {
 
     // -------------------------------------------------
     // Calcualte the zoom here
-    if (m_eState == eViewportState::View && !m_Renderer.m_bShown) {
-        if (CPad::NewMouseControllerState.wheelUp) {
-            if (m_fFOV > 10.0f) {
+    if (m_eState == eViewportState::View && !m_Renderer.m_bShown)
+    {
+        if (CPad::NewMouseControllerState.wheelUp)
+        {
+            if (m_fFOV > 10.0f)
+            {
                 m_fFOV -= 2.0f;
             }
 
@@ -398,8 +440,10 @@ void ViewportMgr::Process() {
             Command<Commands::CAMERA_PERSIST_FOV>(true);
         }
 
-        if (CPad::NewMouseControllerState.wheelDown) {
-            if (m_fFOV < 115.0f) {
+        if (CPad::NewMouseControllerState.wheelDown)
+        {
+            if (m_fFOV < 115.0f)
+            {
                 m_fFOV += 2.0f;
             }
 
@@ -414,22 +458,28 @@ void ViewportMgr::Process() {
     pPlayer->SetPosn(pos);
 }
 
-void ViewportMgr::ProcessInputs() {
-    if (!m_bHovered) {
+void ViewportMgr::ProcessInputs()
+{
+    if (!m_bHovered)
+    {
         return;
     }
 
     // -------------------------------------------------
     // get object selection
-    if (ImGui::IsMouseDoubleClicked(0)) {
+    if (ImGui::IsMouseDoubleClicked(0))
+    {
         CEntity *pEntity;
         CVector pos;
 
-        if (Utils::TraceEntity(pEntity, pos)) {
+        if (Utils::TraceEntity(pEntity, pos))
+        {
             EntMgr.m_pSelected = nullptr;
-            for (auto &ent : EntMgr.m_pPlaced) {
-                if (ent == pEntity) {
-                    EntMgr.m_pSelected = (CObject*)pEntity;
+            for (auto &ent : EntMgr.m_pPlaced)
+            {
+                if (ent == pEntity)
+                {
+                    EntMgr.m_pSelected = (CObject *)pEntity;
                     break;
                 }
             }
@@ -441,41 +491,52 @@ void ViewportMgr::ProcessInputs() {
     static int hObj = NULL;
     static CVector off; // offset between the mouse and the object pivot
 
-    if (!(Popup.m_bShow && ContextMenu.m_bShow)) {
+    if (!(Popup.m_bShow && ContextMenu.m_bShow))
+    {
         // -------------------------------------------------
         // X, Y, Z axis movement
         // TODO: Z axis is kinda buggy
 
-        if (!m_Renderer.m_bShown) {
+        if (!m_Renderer.m_bShown && !ImGuizmoSA::g_Gizmo.IsUsing())
+        {
             static bool bObjectBeingDragged;
 
-            if (ImGui::IsMouseDown(0) && EntMgr.m_pSelected) {
+            if (ImGui::IsMouseDown(0) && EntMgr.m_pSelected)
+            {
                 CEntity *pEntity;
                 static CVector pos, off;
                 bool bFound = Utils::TraceEntity(pEntity, pos);
 
-                if (bFound) {
-                    if (bObjectBeingDragged) {
+                if (bFound)
+                {
+                    if (bObjectBeingDragged)
+                    {
                         auto &data = EntMgr.m_Info.Get(EntMgr.m_pSelected);
                         CVector objPos = CVector(pos.x - off.x, pos.y - off.y, pos.z - off.z);
 
-                        if (Interface.m_bAutoSnapToGround) {
+                        if (Interface.m_bAutoSnapToGround)
+                        {
                             float offZ = objPos.z - EntMgr.GetBoundingBoxGroundZ(EntMgr.m_pSelected);
                             objPos.z = CWorld::FindGroundZFor3DCoord(objPos.x, objPos.y, objPos.z + 100.0f, nullptr, nullptr) + offZ;
                             off.z = pos.z - objPos.z;
                         }
 
                         Command<Commands::SET_OBJECT_COORDINATES>(data.m_nHandle, objPos.x, objPos.y, objPos.z);
-                    } else {
-                        if (pEntity == EntMgr.m_pSelected) {
+                    }
+                    else
+                    {
+                        if (pEntity == EntMgr.m_pSelected)
+                        {
                             off = pos - pEntity->GetPosition();
                             bObjectBeingDragged = true;
                         }
                     }
                 }
-            } else {
-                if (bObjectBeingDragged
-                        && Interface.m_bAutoSnapToGround && EntMgr.m_pSelected) {
+            }
+            else
+            {
+                if (bObjectBeingDragged && Interface.m_bAutoSnapToGround && EntMgr.m_pSelected)
+                {
                     auto &data = EntMgr.m_Info.Get(EntMgr.m_pSelected);
                     CVector pos = EntMgr.m_pSelected->GetPosition();
                     float offZ = pos.z - EntMgr.GetBoundingBoxGroundZ(EntMgr.m_pSelected);
@@ -490,50 +551,63 @@ void ViewportMgr::ProcessInputs() {
         // Z axis movement
         ImGuiIO &io = ImGui::GetIO();
         float wheel = io.MouseWheel;
-        if (wheel && EntMgr.m_pSelected && m_eState == eViewportState::Edit) {
-            if (KeyPressed(VK_LCONTROL)) {
+        if (wheel && EntMgr.m_pSelected && m_eState == eViewportState::Edit)
+        {
+            if (KeyPressed(VK_LCONTROL))
+            {
                 auto &data = EntMgr.m_Info.Get(EntMgr.m_pSelected);
                 CVector rot = data.GetEuler();
-                rot.z += 3*wheel;
+                rot.z += 3 * wheel;
 
-                if (rot.z > 360.0f) {
+                if (rot.z > 360.0f)
+                {
                     rot.z -= 360.0f;
                 }
 
-                if (rot.z < 0.0f) {
+                if (rot.z < 0.0f)
+                {
                     rot.z += 360.0f;
                 }
 
                 data.SetEuler(rot);
-            } else {
+            }
+            else
+            {
                 CVector objPos = EntMgr.m_pSelected->GetPosition();
                 Command<Commands::SET_OBJECT_COORDINATES>(CPools::GetObjectRef(EntMgr.m_pSelected),
-                        objPos.x, objPos.y, objPos.z + wheel/3);
+                                                          objPos.x, objPos.y, objPos.z + wheel / 3);
             }
         }
 
-
-        if (!Interface.m_bInputLocked) {
+        if (!Interface.m_bInputLocked)
+        {
             // -------------------------------------------------
             // Context menu shortcuts
-            if (newObjKey.Pressed()) {
+            if (newObjKey.Pressed())
+            {
                 ContextMenu_NewObject();
             }
-            if (copyKey.Pressed()) {
+            if (copyKey.Pressed())
+            {
                 ContextMenu_Copy();
             }
-            if(pasteKey.Pressed()) {
+            if (pasteKey.Pressed())
+            {
                 ContextMenu_Paste();
             }
-            if(deleteKey.Pressed()) {
+            if (deleteKey.Pressed())
+            {
                 Action_RemoveSelectedObject();
             }
-            if(snapKey.Pressed()) {
+            if (snapKey.Pressed())
+            {
                 ContextMenu_SnapToGround();
             }
             // -------------------------------------------------
         }
-    } else {
+    }
+    else
+    {
         hObj = NULL;
     }
     // -------------------------------------------------

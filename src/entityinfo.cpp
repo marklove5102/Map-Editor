@@ -24,12 +24,15 @@ void EntityInfo::SetEuler(CVector rot)
     RwV3d ax = {1, 0, 0};
     RwV3d ay = {0, 1, 0};
     RwV3d az = {0, 0, 1};
-    RtQuatRotate((RtQuat *)&q, &ax, rot.x, rwCOMBINEREPLACE);
+
+    // Apply in Z, then Y, then X order
+    RtQuatRotate((RtQuat *)&q, &az, rot.z, rwCOMBINEREPLACE);
     q.Normalise();
     RtQuatRotate((RtQuat *)&q, &ay, rot.y, rwCOMBINEPOSTCONCAT);
     q.Normalise();
-    RtQuatRotate((RtQuat *)&q, &az, rot.z, rwCOMBINEPOSTCONCAT);
+    RtQuatRotate((RtQuat *)&q, &ax, rot.x, rwCOMBINEPOSTCONCAT);
     q.Normalise();
+
     SetQuat(q);
     m_Euler = rot;
 }
