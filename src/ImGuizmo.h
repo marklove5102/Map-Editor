@@ -36,7 +36,7 @@ namespace ImGuizmoSA
         // Colors
         ImU32 mAxisColors[3];
         ImU32 mHoverColor;
-        ImU32 mActiveColor;
+        ImU32 mActiveColor, mCenterColor, mCenterHoverColor;
 
     public:
         Gizmo();

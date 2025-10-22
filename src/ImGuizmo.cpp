@@ -1,19 +1,26 @@
 #include "pch.h"
 #include "utils/utils.h"
-#include "ImGuizmoSA.h"
+#include "ImGuizmo.h"
 #include "CMatrix.h"
 #include "CCamera.h"
 #include "CWorld.h"
 #include "CGame.h"
 #include <cmath>
 
-// In ImGuizmoSA.h - change these values to adjust behavior:
+// Enhanced constants for better visibility
+static constexpr float BASE_WORLD_RADIUS = 0.4f;     // Slightly larger base size
+static constexpr float DISTANCE_SCALE_FACTOR = 0.1f; // More visible scaling
+static constexpr float TRANSLATE_SPEED = 0.02f;
+static constexpr float ROTATE_SPEED = 0.01f;
+static constexpr float MAX_WORLD_RADIUS = 4.0f; // Larger maximum size
 
-static constexpr float BASE_WORLD_RADIUS = 0.3f;      // Smaller base size
-static constexpr float DISTANCE_SCALE_FACTOR = 0.08f; // Less aggressive scaling
-static constexpr float TRANSLATE_SPEED = 0.02f;       // Faster translation
-static constexpr float ROTATE_SPEED = 0.01f;          // Rotation sensitivity
-static constexpr float MAX_WORLD_RADIUS = 3.0f;       // Reasonable maximum size
+// New constants for improved visuals
+static constexpr float TRANSLATE_AXIS_LENGTH_FACTOR = 1.6f; // Longer axes
+static constexpr float ROTATION_CIRCLE_THICKNESS = 3.0f;    // Thicker circles
+static constexpr float HOVERED_THICKNESS_MULTIPLIER = 1.5f; // More visible hover
+static constexpr float ACTIVE_THICKNESS_MULTIPLIER = 2.0f;  // More visible active
+
+static constexpr int GIZMO_VISIBLE_DISTANCE = 100; // More visible active
 
 namespace ImGuizmoSA
 {
@@ -29,18 +36,25 @@ namespace ImGuizmoSA
         mIsTranslating = false;
         mIsRotating = false;
 
-        // Classic axis colors
-        mAxisColors[0] = IM_COL32(255, 60, 60, 255);  // Red
-        mAxisColors[1] = IM_COL32(60, 255, 60, 255);  // Green
-        mAxisColors[2] = IM_COL32(60, 120, 255, 255); // Blue
-        mHoverColor = IM_COL32(255, 255, 80, 255);    // Yellow
-        mActiveColor = IM_COL32(255, 255, 0, 255);    // Bright Yellow
+        // More vibrant Blender-like colors
+        mAxisColors[0] = IM_COL32(255, 90, 90, 255);  // Brighter Red
+        mAxisColors[1] = IM_COL32(90, 255, 90, 255);  // Brighter Green
+        mAxisColors[2] = IM_COL32(90, 150, 255, 255); // Brighter Blue
+        mHoverColor = IM_COL32(255, 255, 100, 255);   // Bright Yellow
+        mActiveColor = IM_COL32(255, 255, 0, 255);    // Very Bright Yellow
+
+        // Additional colors for better visibility
+        mCenterColor = IM_COL32(255, 255, 255, 255);
+        mCenterHoverColor = IM_COL32(255, 255, 200, 255);
     }
 
     bool Gizmo::Manipulate(CObject *object)
     {
-        if (!object)
+        float dist = DistanceBetweenPoints(object->GetPosition(), TheCamera.GetPosition());
+        if (!object || dist > GIZMO_VISIBLE_DISTANCE)
+        {
             return false;
+        }
 
         CVector objectPos = object->GetPosition();
         float worldRadius = CalculateWorldRadius(objectPos);
@@ -59,17 +73,17 @@ namespace ImGuizmoSA
         CMatrix objectMatrix = *object->GetMatrix();
         float worldRadius = CalculateWorldRadius(objectPos);
 
-        // Draw rotation gizmo first (background)
+        // Draw rotation gizmo first (background) with improved visibility
         DrawRotationGizmo(objectPos, worldRadius);
 
-        // Draw translation gizmo second (foreground)
+        // Draw translation gizmo second (foreground) with longer axes
         DrawTranslationGizmo(objectPos, objectMatrix, worldRadius);
     }
 
     void Gizmo::DrawTranslationGizmo(const CVector &position, const CMatrix &matrix, float worldRadius)
     {
-        // Scale translation axis length with world radius
-        float axisLength = worldRadius * 0.6f; // Make it proportional to rotation circles
+        // Longer translation axis length
+        float axisLength = worldRadius * TRANSLATE_AXIS_LENGTH_FACTOR;
 
         for (int axis = 0; axis < 3; axis++)
         {
@@ -89,15 +103,21 @@ namespace ImGuizmoSA
             bool isHovered = (mHoveredAxis == axis && mIsTranslating);
             bool isActive = (mActiveAxis == axis && mIsTranslating);
 
-            float thickness = isActive ? 4.0f : (isHovered ? 3.0f : 2.5f);
+            // Thicker lines with better visibility
+            float baseThickness = 3.5f;
+            if (isActive)
+                baseThickness *= ACTIVE_THICKNESS_MULTIPLIER;
+            else if (isHovered)
+                baseThickness *= HOVERED_THICKNESS_MULTIPLIER;
+
             ImU32 color = isActive ? mActiveColor : (isHovered ? mHoverColor : mAxisColors[axis]);
 
             ImDrawList *drawList = ImGui::GetBackgroundDrawList();
 
-            // Draw axis line
-            drawList->AddLine(screenStart, screenEnd, color, thickness);
+            // Draw thicker axis line
+            drawList->AddLine(screenStart, screenEnd, color, baseThickness);
 
-            // Draw arrow head
+            // Draw larger arrow head
             ImVec2 lineDir = ImVec2(screenEnd.x - screenStart.x, screenEnd.y - screenStart.y);
             float lineLength = sqrtf(lineDir.x * lineDir.x + lineDir.y * lineDir.y);
             if (lineLength > 0.0f)
@@ -105,36 +125,40 @@ namespace ImGuizmoSA
                 lineDir = ImVec2(lineDir.x / lineLength, lineDir.y / lineLength);
             }
 
-            float arrowSize = 15.0f;
+            float arrowSize = 23.0f; // Larger arrow head
             ImVec2 perpendicular = ImVec2(-lineDir.y, lineDir.x);
 
             ImVec2 arrowTip = screenEnd;
             ImVec2 arrowBase = ImVec2(screenEnd.x - lineDir.x * arrowSize, screenEnd.y - lineDir.y * arrowSize);
-            ImVec2 arrowWing1 = ImVec2(arrowBase.x + perpendicular.x * arrowSize * 0.5f, arrowBase.y + perpendicular.y * arrowSize * 0.5f);
-            ImVec2 arrowWing2 = ImVec2(arrowBase.x - perpendicular.x * arrowSize * 0.5f, arrowBase.y - perpendicular.y * arrowSize * 0.5f);
+            ImVec2 arrowWing1 = ImVec2(arrowBase.x + perpendicular.x * arrowSize * 0.6f, arrowBase.y + perpendicular.y * arrowSize * 0.6f);
+            ImVec2 arrowWing2 = ImVec2(arrowBase.x - perpendicular.x * arrowSize * 0.6f, arrowBase.y - perpendicular.y * arrowSize * 0.6f);
 
-            // Draw filled arrow head
+            // Draw filled arrow head with outline for better visibility
             drawList->AddTriangleFilled(arrowTip, arrowWing1, arrowWing2, color);
+            drawList->AddTriangle(arrowTip, arrowWing1, arrowWing2, IM_COL32(0, 0, 0, 255), 1.5f);
 
-            // Draw axis label
+            // Enhanced axis label with better visibility
             const char *axisLabels[] = {"X", "Y", "Z"};
-            ImVec2 labelPos = ImVec2(screenEnd.x + lineDir.x * 20.0f, screenEnd.y + lineDir.y * 20.0f);
+            ImVec2 labelPos = ImVec2(screenEnd.x + lineDir.x * 25.0f, screenEnd.y + lineDir.y * 25.0f);
 
-            // Text background for readability
+            // Better text background for readability
             ImVec2 textSize = ImGui::CalcTextSize(axisLabels[axis]);
-            ImVec2 textBgMin = ImVec2(labelPos.x - textSize.x * 0.5f - 3.0f, labelPos.y - textSize.y * 0.5f - 2.0f);
-            ImVec2 textBgMax = ImVec2(labelPos.x + textSize.x * 0.5f + 3.0f, labelPos.y + textSize.y * 0.5f + 2.0f);
-            drawList->AddRectFilled(textBgMin, textBgMax, IM_COL32(0, 0, 0, 180), 3.0f);
+
+            // Draw background with border
             drawList->AddText(labelPos, IM_COL32(255, 255, 255, 255), axisLabels[axis]);
         }
 
-        // Draw center point
+        // Enhanced center point
         float screenX, screenY;
         if (Utils::WorldToScreen(position.x, position.y, position.z, screenX, screenY))
         {
             ImDrawList *drawList = ImGui::GetBackgroundDrawList();
-            drawList->AddCircleFilled(ImVec2(screenX, screenY), 6.0f, IM_COL32(255, 255, 255, 200));
-            drawList->AddCircle(ImVec2(screenX, screenY), 6.0f, IM_COL32(255, 255, 255, 255), 0, 1.5f);
+            bool centerHovered = (mHoveredAxis == -1 && mIsOver && !mIsTranslating && !mIsRotating);
+            ImU32 centerColor = centerHovered ? mCenterHoverColor : mCenterColor;
+
+            // Larger center point with outline
+            drawList->AddCircleFilled(ImVec2(screenX, screenY), 8.0f, centerColor);
+            drawList->AddCircle(ImVec2(screenX, screenY), 8.0f, IM_COL32(0, 0, 0, 255), 0, 2.0f);
         }
     }
 
@@ -147,46 +171,58 @@ namespace ImGuizmoSA
         ImVec2 center(screenX, screenY);
         ImDrawList *drawList = ImGui::GetBackgroundDrawList();
 
-        // Draw three circles in WORLD SPACE
+        // Draw three circles in WORLD SPACE with improved thickness
         for (int axis = 0; axis < 3; axis++)
         {
             bool isHovered = (mHoveredAxis == axis && mIsRotating);
             bool isActive = (mActiveAxis == axis && mIsRotating);
 
             ImU32 color = isActive ? mActiveColor : (isHovered ? mHoverColor : mAxisColors[axis]);
-            float thickness = isActive ? 3.0f : (isHovered ? 2.5f : 2.0f);
 
-            // Draw circle in WORLD SPACE axes
-            const int segments = 48; // Reduced segments for smaller circles
-            for (int i = 0; i < segments; i++)
+            // Much thicker circles with hover/active multipliers
+            float thickness = ROTATION_CIRCLE_THICKNESS;
+            if (isActive)
+                thickness *= ACTIVE_THICKNESS_MULTIPLIER;
+            else if (isHovered)
+                thickness *= HOVERED_THICKNESS_MULTIPLIER;
+
+            // More segments for smoother circles
+            const int segments = 64;
+            std::vector<ImVec2> screenPoints;
+            screenPoints.reserve(segments);
+
+            // Pre-calculate all screen points for the circle
+            for (int i = 0; i <= segments; i++)
             {
-                float angle1 = (float)i / (float)segments * 2.0f * 3.14159f;
-                float angle2 = (float)(i + 1) / (float)segments * 2.0f * 3.14159f;
-
-                CVector p1, p2;
+                float angle = (float)i / (float)segments * 2.0f * 3.14159f;
+                CVector worldPoint;
 
                 if (axis == 0)
                 { // X-axis circle (YZ plane in world space)
-                    p1 = position + CVector(0, cosf(angle1) * worldRadius, sinf(angle1) * worldRadius);
-                    p2 = position + CVector(0, cosf(angle2) * worldRadius, sinf(angle2) * worldRadius);
+                    worldPoint = position + CVector(0, cosf(angle) * worldRadius, sinf(angle) * worldRadius);
                 }
                 else if (axis == 1)
                 { // Y-axis circle (XZ plane in world space)
-                    p1 = position + CVector(cosf(angle1) * worldRadius, 0, sinf(angle1) * worldRadius);
-                    p2 = position + CVector(cosf(angle2) * worldRadius, 0, sinf(angle2) * worldRadius);
+                    worldPoint = position + CVector(cosf(angle) * worldRadius, 0, sinf(angle) * worldRadius);
                 }
                 else
                 { // Z-axis circle (XY plane in world space)
-                    p1 = position + CVector(cosf(angle1) * worldRadius, sinf(angle1) * worldRadius, 0);
-                    p2 = position + CVector(cosf(angle2) * worldRadius, sinf(angle2) * worldRadius, 0);
+                    worldPoint = position + CVector(cosf(angle) * worldRadius, sinf(angle) * worldRadius, 0);
                 }
 
-                // Convert to screen space
-                float p1X, p1Y, p2X, p2Y;
-                if (Utils::WorldToScreen(p1.x, p1.y, p1.z, p1X, p1Y) &&
-                    Utils::WorldToScreen(p2.x, p2.y, p2.z, p2X, p2Y))
+                float pointX, pointY;
+                if (Utils::WorldToScreen(worldPoint.x, worldPoint.y, worldPoint.z, pointX, pointY))
                 {
-                    drawList->AddLine(ImVec2(p1X, p1Y), ImVec2(p2X, p2Y), color, thickness);
+                    screenPoints.push_back(ImVec2(pointX, pointY));
+                }
+            }
+
+            // Draw the circle as connected lines
+            if (screenPoints.size() > 1)
+            {
+                for (size_t i = 0; i < screenPoints.size() - 1; i++)
+                {
+                    drawList->AddLine(screenPoints[i], screenPoints[i + 1], color, thickness);
                 }
             }
         }
@@ -219,16 +255,20 @@ namespace ImGuizmoSA
             mIsRotating = false;
         }
 
+        // Increased hover thresholds for better interaction
+        float translationThreshold = 20.0f; // Larger hit area for translation
+        float rotationThreshold = 25.0f;    // Larger hit area for rotation
+
         // Hover detection - check both translation and rotation
         if (mActiveAxis == -1)
         {
-            float bestDistance = 15.0f; // Pixel threshold
+            float bestDistance = translationThreshold;
 
             // Check translation axes first (they have priority for interaction)
             for (int axis = 0; axis < 3; axis++)
             {
                 CVector axisDir = GetAxisDirection(axis, objectMatrix);
-                float axisLength = worldRadius * 0.6f; // Same as drawing
+                float axisLength = worldRadius * TRANSLATE_AXIS_LENGTH_FACTOR;
                 CVector axisEnd = objectPos + axisDir * axisLength;
 
                 float screenStartX, screenStartY, screenEndX, screenEndY;
@@ -238,7 +278,7 @@ namespace ImGuizmoSA
                     continue;
                 }
 
-                // Check distance to translation axis line
+                // Check distance to translation axis line with larger threshold
                 ImVec2 lineDir = ImVec2(screenEndX - screenStartX, screenEndY - screenStartY);
                 float lineLength = sqrtf(lineDir.x * lineDir.x + lineDir.y * lineDir.y);
                 if (lineLength > 0.0f)
@@ -253,7 +293,7 @@ namespace ImGuizmoSA
                 ImVec2 closestPoint = ImVec2(screenStartX + lineDir.x * projection, screenStartY + lineDir.y * projection);
                 float distance = sqrtf(powf(mousePos.x - closestPoint.x, 2) + powf(mousePos.y - closestPoint.y, 2));
 
-                // Also check arrow head
+                // Also check arrow head with larger threshold
                 float arrowDistance = sqrtf(powf(mousePos.x - screenEndX, 2) + powf(mousePos.y - screenEndY, 2));
                 distance = std::min(distance, arrowDistance);
 
@@ -267,13 +307,15 @@ namespace ImGuizmoSA
                 }
             }
 
-            // If no translation axis hovered, check rotation circles
+            // If no translation axis hovered, check rotation circles with larger threshold
             if (mHoveredAxis == -1)
             {
+                bestDistance = rotationThreshold;
+
                 for (int axis = 0; axis < 3; axis++)
                 {
-                    // Test points around the world-space circle
-                    const int testPoints = 20;
+                    // Test points around the world-space circle with more test points
+                    const int testPoints = 30;
                     for (int i = 0; i < testPoints; i++)
                     {
                         float angle = (float)i / (float)testPoints * 2.0f * 3.14159f;
@@ -309,9 +351,9 @@ namespace ImGuizmoSA
                 }
             }
 
-            // Check center point
+            // Check center point with larger threshold
             float centerDist = sqrtf(powf(mousePos.x - center.x, 2) + powf(mousePos.y - center.y, 2));
-            if (centerDist < 10.0f && centerDist < bestDistance)
+            if (centerDist < 15.0f && centerDist < bestDistance)
             {
                 mHoveredAxis = -1;
                 mIsOver = true;

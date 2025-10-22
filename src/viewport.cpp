@@ -11,7 +11,7 @@
 #include <CSprite.h>
 #include <D3dx9math.h>
 #include "editor.h"
-#include "ImGuizmoSA.h"
+#include "ImGuizmo.h"
 
 #include "contextmenus.h"
 #include "popups.h"
@@ -261,12 +261,10 @@ void ViewportMgr::DrawOverlay()
     {
         m_bHovered = ImGui::IsWindowHovered();
 
-        if (EntMgr.m_pSelected)
+        if (EntMgr.m_pSelected && !m_Renderer.m_bShown)
         {
-            if (ImGuizmoSA::g_Gizmo.Manipulate(EntMgr.m_pSelected))
-            {
-                // Gizmo is being used - object is automatically updated
-            }
+            ImGuizmoSA::g_Gizmo.SetMode(ImGuizmoSA::SPACE_MODE::WORLD);
+            ImGuizmoSA::g_Gizmo.Manipulate(EntMgr.m_pSelected);
         }
 
         // if (ObjManager::m_pSelected)

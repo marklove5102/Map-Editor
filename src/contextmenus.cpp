@@ -30,6 +30,7 @@ static void QuickObjectCreatePopup()
         int hObj;
         Command<Commands::REQUEST_MODEL>(modelId);
         Command<Commands::LOAD_ALL_MODELS_NOW>();
+
         Command<Commands::CREATE_OBJECT>(modelId, Viewport.m_fCursorWorldPos.x,
                                          Viewport.m_fCursorWorldPos.y, Viewport.m_fCursorWorldPos.z, &hObj);
         // Command<Commands::MARK_MODEL_AS_NO_LONGER_NEEDED>(modelId);
@@ -400,7 +401,7 @@ void ContextMenu_Viewport(std::string &root, std::string &key, std::string &valu
                 ContextMenu.m_bShow = false;
             }
 
-            ImGui::End();
+            ImGui::EndMenu();
         }
         if (ImGui::MenuItem("Open in browser"))
         {
@@ -409,7 +410,7 @@ void ContextMenu_Viewport(std::string &root, std::string &key, std::string &valu
             Viewport.m_Renderer.m_bShowNextFrame = true;
             ContextMenu.m_bShow = false;
         }
-        ImGui::End();
+        ImGui::EndMenu();
     }
 
     ImGui::Separator();

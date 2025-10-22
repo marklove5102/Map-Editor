@@ -6,6 +6,8 @@
 #include <CScene.h>
 
 #include "viewport.h"
+#include <CVisibilityPlugins.h>
+#include <NodeName.h>
 
 void ModelRenderer::UnloadModel()
 {
@@ -85,7 +87,22 @@ void ModelRenderer::RenderModel()
 
     if (m_pRpClump)
     {
-        RpClumpRender(m_pRpClump);
+        RpClumpForAllAtomics(
+            m_pRpClump,
+            [](RpAtomic *at, void *) -> RpAtomic *
+            {
+                std::string name = GetFrameNodeName(RpAtomicGetFrame(at));
+                bool isDamAtomic = (CVisibilityPlugins::GetAtomicId((RpAtomic *)at) & 3) == 2;
+                if (isDamAtomic || name == "chassis_vlo" || name.ends_with("dam"))
+                {
+                    return at;
+                }
+
+                // RpAtomicRender(at);
+                plugin::Call<0x7491C0>(at);
+                return at;
+            },
+            nullptr);
     }
     else if (m_pRpAtomic)
     {
